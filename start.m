@@ -1,0 +1,70 @@
+n=1000;%种群个体总数
+prob=0.01;%初期患病率
+K=1;%病毒传播能力与人员流动速度正相关系数
+alpha=0.02;%人员流动速度
+beta=K*alpha;%病毒传播能力
+data=creat_data(n,prob);%初始化种群
+period_day=10;%病毒潜伏周期
+gamma=100;%假设治疗天数大于gamma即可治愈
+
+%用于存储历史各项指标下人数
+history_period_num=[];%处于潜伏期的人数
+history_feve_num=[];%处于发热期的人数
+history_diagnose_num=[0];%处于确诊的人数
+history_crease_diagnose_num_per_day=[];%每天确诊增长人数
+
+%存储SIR模型各项指标人数
+S=[];I=[];R=[];
+
+for i =1:200
+    
+        
+    %政府干预时间点
+    if i>=30
+        data =isolats(data);%将已发现感染者进行隔离，不具有传染性
+%         alpha=0.01;%人员流动速度
+%        alpha=0.000;%人员流动速度
+       alpha=0.005;%人员流动速度
+        beta=K*alpha;%病毒传播能力
+    end
+    if sum(data(:,3))==size(data,1)
+        break
+    end
+    
+    %更新一次人员流动后的个体位置
+    data=shift_speed(data,alpha);
+    infected_mat=neighbour(data,beta);
+    data=notify_infected(data,infected_mat);
+    subplot(2,2,4)
+    creat_plot(data);
+    
+    %%每进行一天将感染者处于潜伏期的天数加一,第七列处于潜伏期天数
+    data=update_at_period_day(data);
+    %将达到病毒潜伏期设为确诊,第五列是否确诊
+    data=diagnose(data,period_day);
+    data=updata_treat_day(data);
+    %将治疗天数大于gamma的患者设为安全
+    data=treated_succession(data,gamma);
+    
+    %
+    [period_num,fever_num,diagnose_num]=get_all_index_num(data);
+    history_period_num=[history_period_num,period_num];
+    history_feve_num=[history_feve_num,fever_num];
+    history_diagnose_num=[history_diagnose_num,diagnose_num];
+    crease=history_diagnose_num(size(history_diagnose_num,2))-history_diagnose_num(size(history_diagnose_num,2)-1);
+    history_crease_diagnose_num_per_day=[history_crease_diagnose_num_per_day,crease];
+    
+    %易感人数
+    S_temp=size(data,1)-sum(data(:,3));
+    S=[S,S_temp];
+    I_temp=sum(data(:,3))-sum((data(:,6)));
+    I=[I,I_temp];
+    R_temp=sum(data(:,6));
+    R=[R,R_temp];
+    
+    plot_index(history_period_num,history_crease_diagnose_num_per_day,history_diagnose_num,S,I,R);
+    
+    pause(0.1)
+end
+
+
